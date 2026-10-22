@@ -1,0 +1,1 @@
+{"id": "./", "name": "隆兴供应链互动讲解", "short_name": "隆兴讲解", "lang": "zh-CN", "start_url": "./", "scope": "./", "display": "standalone", "background_color": "#f3f6fb", "theme_color": "#124e94", "icons": [{"src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any"}]}
