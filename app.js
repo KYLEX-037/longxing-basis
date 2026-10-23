@@ -37,6 +37,7 @@ function render(){
   $('steps').innerHTML=s.steps.map((name,i)=>'<button data-step="'+i+'" class="'+(i===step?'active':i<step?'done':'')+'" aria-label="第'+(i+1)+'步：'+name+'" '+(i===step?'aria-current="step"':'')+'><span class="num">'+(i+1)+'</span><span>'+name+'</span></button>').join('');
   $('sceneLabel').textContent=s.name+' · '+m.source;
   $('stepCount').textContent=(step+1)+' / 6';
+  $('readingProgress').style.width=((step+1)/6*100)+'%';
   const trend=e.change>0?'走强':e.change<0?'走弱':'不变';
   const outcome=e.gross>0?'浮盈':e.gross<0?'浮亏':'盈亏平衡';
   const titles=['一批钢材，两个市场报价','看清这道减法，就是基差',r?'卖出现货，同时买入期货':'买入现货，同时卖出期货','过一段时间，基差'+trend,r?'买回现货，期货卖出平仓':'卖出现货，期货买入平仓','两种算法，算出同一笔收益'];
@@ -77,10 +78,20 @@ function render(){
   }else{
     html='<section class="method"><h3><span class="method-tag">算法一</span>现货盈亏 ＋ 期货盈亏</h3>'+legs(m,e)+equation(e.spot,e.futures>=0?'＋':'−',Math.abs(e.futures),e.gross,r?'现货轮换差额':'现货盈亏',e.futures<0?'期货亏损':'期货盈利')+'</section><section class="method"><h3><span class="method-tag">算法二</span>'+ (r?'建仓基差 − 离场基差':'离场基差 − 建仓基差')+'</h3>'+basisProfit(m,e)+'</section><p class="equality-note">两笔盈亏之和 = '+(r?'建仓基差 − 离场基差':'离场基差 − 建仓基差')+'，两种算法相等。</p>';
     html+='<div class="result"><div><label>'+s.name+' · 每吨毛'+(e.gross<0?'亏损':'收益')+'</label><strong>'+signed(e.gross)+' <em>元/吨</em></strong><p>尚未扣成本'+(mode==='real'?'，未考虑合作分成':'')+'</p></div><div>'+(m.quantity?'<div class="amount-eq">'+n(e.gross)+' × 5,000 = '+(e.gross*5000).toLocaleString('zh-CN')+' 元</div><p>合计'+(e.gross<0?'毛亏':'毛赚')+n(Math.abs(e.gross*5000/10000))+'万元</p>':'<p>PPT教学示例按每吨演示</p><p>总收益 = 每吨收益 × 实际数量</p>')+'</div></div>';
+    html+='<button id="resultCost" class="result-cost"><span><b>毛收益还要扣成本</b><small>'+(e.gross>0?'综合成本低于 '+n(e.gross)+' 元/吨，净收益才为正。':e.gross===0?'毛收益为0；有成本就会产生净亏损。':'本情景未扣成本已经亏损，扣成本后亏损会增加。')+'</small></span><strong>算净收益 →</strong></button>';
     tip=mode==='give'?'26 − 10 − 10 = 6元/吨。其他成本低于6元/吨时，净收益才为正。':mode==='reverseGive'?'130 − 10 − 10 = 110元/吨。其他成本低于110元/吨时，净收益才为正。':r?'反套希望基差走弱。现货轮换差额不包含原库存历史成本对应的会计利润。':mode==='rise'?'现货、期货都涨，正套也能盈利：现货多赚210，期货亏130，合计80元/吨。':'判断收益要把两笔合起来看。净收益还要继续减去资金、仓储、运输、手续费等成本。';
   }
+  const narration=[
+    r?'这次讲反套：我们先有一批可卖的库存，今天卖出，之后再买回来。与此同时，在期货市场先买后卖。先看这两个市场各报多少钱。':'同一批钢材有两个价格：一个是实际买卖钢材的现货价，一个是期货合约价。我们把两边配起来，看完整一轮买卖会怎样。',
+    '记住一个减法就行：现货减期货。这里是'+n(m.s0)+'减'+n(m.f0)+'，等于'+n(e.b0)+'元一吨。这叫建仓基差，只是起点的价差，还不是利润。',
+    r?'现货这边先卖库存，期货这边先买合约。先买合约叫多头，价格涨了对它有利。我们之后会买回钢材补库存，再卖出期货合约平仓。':'现货买进来放在仓库，期货先卖出合约。这个先卖的头寸叫空头，价格跌了对它有利。注意，卖期货合约不等于已经把仓库里的钢材卖给客户。',
+    '现在基差从'+n(e.b0)+'变成'+n(e.b1)+'，叫基差'+trend+'。'+(r?'反套用建仓基差减去离场基差。':'正套用离场基差减去建仓基差。')+'如果按当前价格同时退出，每吨'+(e.gross<0?'毛亏':'毛赚')+n(Math.abs(e.gross))+'元。目前还没退出，这只是按报价算的浮动结果。',
+    r?'现在把钢材买回来，恢复库存；同时把期货合约卖出平仓。钢材买卖和期货平仓是两件事。这样，这一轮反套就结束了。':'现在把钢材卖给客户，同时在期货市场买入同一合约，把原来的空头平掉。库存销售和期货平仓分别完成，这一轮正套就结束了。',
+    '最后算总账。'+(r?'现货卖出再买回的轮换差额':'现货这边')+(e.spot<0?'亏':'赚')+n(Math.abs(e.spot))+'，期货这边'+(e.futures<0?'亏':'赚')+n(Math.abs(e.futures))+'，合起来每吨'+(e.gross<0?'毛亏':'毛赚')+n(Math.abs(e.gross))+'元。用两次基差再减一遍，结果完全一样。最后还要扣资金、仓储、运输和手续费，才是净收益。'
+  ];
+  $('speakerText').textContent= narration[step];
   $('visual').innerHTML=html;$('takeaway').textContent=tip;$('prev').disabled=step===0;
-  $('next').innerHTML=(step===5?'再讲一遍':'下一步')+' <span aria-hidden="true">'+(step===5?'↺':'→')+'</span>';
+  $('next').innerHTML='<span class="next-copy"><b>'+(step===5?'再讲一遍':'下一步')+'</b><small>'+(step===5?'回到第1步':s.steps[step+1])+'</small></span><span aria-hidden="true">'+(step===5?'↺':'→')+'</span>';
   updateCost();
   for(const id of ['narrative','visual']){$(id).classList.remove('animate');void $(id).offsetWidth;$(id).classList.add('animate')}
 }
@@ -100,13 +111,14 @@ $('steps').onclick=e=>{const b=e.target.closest('[data-step]');if(b)go(+b.datase
 $('modes').onclick=e=>{const b=e.target.closest('[data-mode]');if(b){mode=b.dataset.mode;go(0,true)}};
 document.querySelectorAll('[data-strategy]').forEach(b=>b.onclick=()=>{strategy=b.dataset.strategy;mode=strategies[strategy].modes[0];go(0,true)});
 $('cost').oninput=updateCost;
+$('visual').addEventListener('click',e=>{if(e.target.closest('#resultCost')){openDialog('infoDialog');$('cost').focus()}});
 function openDialog(id){$(id).showModal()}
 $('help').onclick=()=>openDialog('helpDialog');$('economics').onclick=()=>openDialog('infoDialog');
 document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>b.closest('dialog').close());
 document.querySelectorAll('dialog').forEach(d=>d.onclick=e=>{if(e.target===d){const r=d.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)d.close()}});
 $('fullscreen').onclick=async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await document.documentElement.requestFullscreen()}catch{openDialog('helpDialog')}};
 document.addEventListener('fullscreenchange',()=>{$('fullscreen').textContent=document.fullscreenElement?'退出全屏':'全屏'});
-document.addEventListener('keydown',e=>{if(document.querySelector('dialog[open]')||/INPUT|BUTTON|SUMMARY|TEXTAREA/.test(e.target.tagName))return;if(e.key==='ArrowRight'){e.preventDefault();$('next').click()}if(e.key==='ArrowLeft'){e.preventDefault();$('prev').click()}});
+document.addEventListener('keydown',e=>{if(document.querySelector('dialog[open]')||/INPUT|SELECT|SUMMARY|TEXTAREA/.test(e.target.tagName))return;if(e.key==='ArrowRight'){e.preventDefault();$('next').click()}if(e.key==='ArrowLeft'){e.preventDefault();$('prev').click()}});
 let installPrompt;window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();installPrompt=e;$('installApp').hidden=false});
 $('installApp').onclick=async()=>{if(installPrompt){await installPrompt.prompt();installPrompt=null;$('installApp').hidden=true}};
 let offlineReady=false;function status(message){$('offlineStatus').textContent=message;$('offlineDetail').textContent=message}
